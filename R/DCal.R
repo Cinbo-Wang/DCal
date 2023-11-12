@@ -246,8 +246,8 @@ DCal.mean_treat <-
             mean_treat_ped_var)
 
         }
-      stopImplicitCluster()
-      stopCluster(cl)
+      doParallel::stopImplicitCluster()
+      parallel::stopCluster(cl)
     } else{
       ATE_mat <- matrix(0, nrow = B, ncol = 4)
       for (b in 1:B) {
@@ -364,7 +364,6 @@ DCal.mean_treat <-
 # Additional functions: -------------------------
 ## Solve for mu: Quadratic program--------------------
 #' @keywords internal
-#' @import Rmosek
 quad.prog.Lagr <- function(M,
                            target,
                            Mr,
