@@ -1,0 +1,26 @@
+Package: DCal
+Type: Package
+Title: Root-n consistent semiparametric learning with high-dimensional
+        nuisance functions under minimal sparsity
+Version: 0.1.0
+Authors@R: c(
+    person("Xinbo", "Wang", email = "cinbo_w@sjtu.edu.cn", role = c("cre", "aut")),
+    person("Liu", "Liu", email = "linliu@sjtu.edu.cn", role = "ctb"),
+    person("Yuhao", "Wang", email = "yuhaow.thu@gmail.com", role = "ctb"))
+Maintainer: Xinbo Wang <cinbo_w@sjtu.edu.cn>
+Description: DCal package is designed for treatment effect estimation with high-dimensional nuisance parameters. 
+    It uses a new Double-Calibration strategy that corrects the estimation bias of the nuisance parameter estimates
+    computated by regularized high-dimensional techniques. Details of the methodology can be found in Lin Liu and Yuhao Wang (2023) 
+    "Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity"
+    <arXiv:2305.04174>. The package relies on the optimisation
+    software 'MOSEK' <https://www.mosek.com/> which must be installed separately;
+    see the documentation for 'Rmosek'. 
+License: GPL-3
+Encoding: UTF-8
+RoxygenNote: 7.2.3
+NeedsCompilation: no
+Imports: doParallel, foreach, glmnet, Rmosek, stats
+Packaged: 2023-11-12 13:57:53 UTC; Cinbo_W
+Author: Xinbo Wang [cre, aut],
+  Liu Liu [ctb],
+  Yuhao Wang [ctb]
