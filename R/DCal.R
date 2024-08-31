@@ -1,24 +1,24 @@
 
-#' Estimation of E[Y(1)] or E[Y(0)] from observational data using Double Calibration Estimator.
+#' Estimation of E[Y(1)] from observational data using Double Calibration Estimator.
 #'
-#' @param X The n by p input covariance matrix.
+#' @param X The n by p input data matrix.
 #' @param Y The n dimensional observed response.
 #' @param W The n dimensional binary vector indicating treatment assignment.
+#' @param Y.family Response type. A character string representing one of the built-in families, including 'gaussian' and 'binomial'.
 #' @param B The number of iterations for random splits for cross-fitting.
-#' @param r1 Optional n dimensional vector of an initial estimate of E[Y_i(1) |
+#' @param is.scale Whether or not to scale the input data matrix.
+#' @param r1_init Optional n dimensional vector of an initial estimate of E[Y_i |
+#'   X_i, T_i=1] for i = 1, ..., n. The default is NULL.
+#' @param pi_init Optional n dimensional vector of an initial estimate of E[W_i |
 #'   X_i] for i = 1, ..., n. The default is NULL.
-#' @param pi Optional n dimensional vector of an initial estimate of E[W_i |
-#'   X_i] for i = 1, ..., n. The default is NULL.
-#' @param is.scale Whether or not to scale the input covariance matrix.
-#' @param Y.family Response type. A character string representing one of the built-in families, including 'gaussion' and 'binomial'.
 #' @param alpha The elastic net mixing parameter, with \(0 \eqn{\leq} alpha \eqn{\leq} 1\).
 #' @param is.parallel Whether to perform parallel computation. Default is False.
 #' @param core_num Number of cores used for parallel computation.
-#'
+#' @param ratio_violate_dcal The maximum allowable ratio of violations in inequations during the Double Calibrated step. The default value is 0.01.
 #' @return
-#' \item{ATE_sc}{Single calibation estimation of E[Y(1)] or E[Y(0)] averaged over B random splits.}
+#' \item{ATE_sc}{Single calibation estimation of E[Y(1)] averaged over B random splits.}
 #' \item{ATE_sc_var}{Estimated variance of the ATE_sc averaged over B random splits.}
-#' \item{ATE_dc}{Double calibation estimation of E[Y(1)] or E[Y(0)] averaged over B random splits.}
+#' \item{ATE_dc}{Double calibation estimation of E[Y(1)] averaged over B random splits.}
 #' \item{ATE_dc_var}{Estimated variance of the ATE_dc averaged over B random splits.}
 #' \item{ATE_mat}{A matrix containing ATE_sc, ATE_sc_var, ATE_dc and ATE_dc_var in each random split.}
 #'
@@ -30,7 +30,7 @@
 #' @examples
 #' \dontrun{
 #' # Sparse OR, dense nonlinear PS--------
-#' p = 300; s_or = 10; n = 100;rho=0.9;rd_num = 1
+#' p = 400; s_or = 10; n = 200;rho=0.9;rd_num = 1
 #' Sigma_X <- matrix(0,p,p)
 #' for(i in 1:p){
 #'   for(j in 1:p){
@@ -41,10 +41,10 @@
 #' X <- MASS::mvrnorm(n=n,mu=rep(0,p),Sigma = Sigma_X)
 #' # dense propensity model
 #' Xf <- X[,1:4]
-#' Xf[,1] <- exp(0.5*X[,1])
-#' Xf[,2] <- 10 + X[,2]/(1+exp(X[,1]))
-#' Xf[,3] <- (0.05*X[,1]*X[,3]+0.6)**2
-#' Xf[,4] <- (X[,2]+X[,4]+10)**2
+#' Xf[,1] <- exp(0.5 * X[,1])
+#' Xf[,2] <- 10 + X[,2] / (1 + exp(X[,1]))
+#' Xf[,3] <- (0.05 * X[,1] * X[,3] + 0.6)**2
+#' Xf[,4] <- (X[,2] + X[,4] + 10)**2
 #'
 #' gamma_true <- rep(0,p)
 #' for(j in 1:p){
@@ -60,15 +60,15 @@
 #' # sparse linear OR
 #' beta_true <- rep(0,p)
 #' act_loc <- 1:d_beta # Confounder
-#' beta_true[act_loc] <- runif(d_beta,1,2)*sample(c(1,-1),size=d_beta,replace = T)
+#' beta_true[act_loc] <- runif(d_beta,1,2)
 #' beta_true <-  beta_true / norm(beta_true,type='2')
 #' potential_outcome_treat <- X %*% beta_true + 1
-#' potential_outcome_control <- X %*% beta_true
-#' Y <- potential_outcome_treat*W + potential_outcome_control*(1-W) + rnorm(n,0,1)
+#' potential_outcome_control <- X %*% beta_true - 1
+#' Y <- potential_outcome_treat * W + potential_outcome_control * (1-W) + rnorm(n,0,1)
 #' tau_treat <- mean(potential_outcome_treat)
 #'
-#' mean_treat_dcal_ls <- DCal.mean_treat(X,Y,W,B=3,r1 = NULL,pi = NULL,
-#'                      is.scale = T,Y.family = 'gaussian',alpha = 0.9, is.parallel=FALSE)
+#' mean_treat_dcal_ls <- DCal.mean_treat(X,Y,W,B=6,r1 = NULL,pi = NULL,
+#'                      is.scale = FALSE,Y.family = 'gaussian',alpha = 0.9, is.parallel=FALSE)
 #'
 #' mean_treat_dcal_ls
 #' }
@@ -83,13 +83,14 @@ DCal.mean_treat <-
            Y,
            W,
            Y.family = c('gaussian', 'binomial')[1],
-           B = 3,
+           B = 6,
            is.scale = TRUE,
-           r1 = NULL,
-           pi = NULL,
+           r1_init = NULL,
+           pi_init = NULL,
            alpha = 0.9,
            is.parallel = FALSE,
-           core_num = NULL) {
+           core_num = NULL,
+           ratio_violate_dcal=0.01) {
     # require(glmnet)
     if (is.scale) {
       scl <- apply(X, 2, sd, na.rm = TRUE)
@@ -101,7 +102,7 @@ DCal.mean_treat <-
     }
 
 
-    if (is.null(r1)) {
+    if (is.null(r1_init)) {
       fit.out.treated <-
         cv.glmnet(X[W == 1,],
                   Y[W == 1],
@@ -111,10 +112,10 @@ DCal.mean_treat <-
       r1_out <-
         predict(fit.out.treated, newx = X, type = 'response')
     } else{
-      r1_out <- r1
+      r1_out <- r1_init
     }
 
-    if (is.null(pi)) {
+    if (is.null(pi_init)) {
       fit.prop <-
         cv.glmnet(X,
                   W,
@@ -124,7 +125,7 @@ DCal.mean_treat <-
       pi_hat <- predict(fit.prop, newx = X, type = 'response')
       pi_hat <- pmax(pmin(pi_hat, 0.99), 0.01)
     } else{
-      pi_hat <- pi
+      pi_hat <-  pmax(pmin(pi_init, 0.99), 0.01)
     }
 
 
@@ -156,7 +157,6 @@ DCal.mean_treat <-
             loc_aux <- sample(loc_aux, size = length(loc_aux))
 
             X_main <- cbind(1, scale(X[loc_main,], scale = FALSE))
-
             X_aux <- cbind(1, scale(X[loc_aux,], scale = FALSE))
 
             W_main <- W[loc_main]
@@ -179,18 +179,22 @@ DCal.mean_treat <-
 
             target <-  t(X_aux) %*% Pi_aux %*% R_aux / n_aux
 
-            if (max(abs(target)) <= 0.5 * sqrt(log(p) / n_main)) {
+
+            ratio_violate <- sum(abs(target)>0.5*sqrt(log(p) / n_main)) / length(target)
+            if (ratio_violate< 0.01) {
               # If constraint is satisfied.
               mu_hat_main <- rep(0, n_main)
             } else{
               M <- t(X_main) %*% Pi_main / n_main
+              weight_term <- ifelse(ratio_violate>0.1,2,3/2)
               mu_hat_main_tmp_ls <-
                 quad.prog.Lagr(
                   M = M,
                   target = target,
                   Mr = max(abs(Y)),
                   kappa = 0.5,
-                  verbose = FALSE
+                  verbose = FALSE,
+                  weight_term = weight_term
                 )
               if (mu_hat_main_tmp_ls$is_converge) {
                 mu_hat_main <- mu_hat_main_tmp_ls$mu_hat
@@ -201,6 +205,7 @@ DCal.mean_treat <-
 
             mu_hat[loc_main] <- mu_hat_main
           }
+
           mean_treat_init <-
             sum(W * (Y - mu_hat - r1_out) / pi_hat) / sum(W / pi_hat) + sum(mu_hat + r1_out) / nrow(X)
           mean_treat_init_vec <- W * (Y - mu_hat - r1_out) / pi_hat + mu_hat + r1_out
@@ -217,9 +222,11 @@ DCal.mean_treat <-
           n <- nrow(X_tilde)
           p <- ncol(X_tilde)
           lambda_vec <- sqrt(log(p) / n) * sqrt(colSums(X_tilde ** 2)) / sqrt(n)
-          constr_left <- abs(colSums(diag(as.numeric(W / pi_hat - 1)) %*% X_tilde)) / n
 
-          if (all(constr_left <= lambda_vec)) {
+          constr_left <- abs(colSums(diag(as.numeric(W / pi_hat - 1)) %*% X_tilde)) / n
+          ratio_violate <- sum(constr_left > lambda_vec)/length(constr_left)
+
+          if (ratio_violate < ratio_violate_dcal) {
             weight_tilde <- weight_init
           } else{
             weight_ls <-
@@ -283,17 +290,22 @@ DCal.mean_treat <-
           R_aux <- W_aux * (Y_aux - r1_aux) / pi_hat_aux
           Pi_main <- diag(1 - pi_hat_main)
           target <-  t(X_aux) %*% Pi_aux %*% R_aux / n_aux
-          if (max(abs(target)) <= 0.5 * sqrt(log(p) / n_main)) {
+
+          ratio_violate <- sum(abs(target)>0.5*sqrt(log(p) / n_main)) / length(target)
+
+          if (ratio_violate < 0.01) {
             mu_hat_main <- rep(0, n_main)
           } else{
             M <- t(X_main) %*% Pi_main / n_main
+            weight_term <- ifelse(ratio_violate>0.1,2,3/2)
             mu_hat_main_tmp_ls <-
               quad.prog.Lagr(
                 M = M,
                 target = target,
                 Mr = max(abs(Y)),
                 kappa = 0.5,
-                verbose = FALSE
+                verbose = FALSE,
+                weight_term = weight_term
               )
             if (mu_hat_main_tmp_ls$is_converge) {
               mu_hat_main <- mu_hat_main_tmp_ls$mu_hat
@@ -318,9 +330,11 @@ DCal.mean_treat <-
         n <- nrow(X_tilde)
         p <- ncol(X_tilde)
         lambda_vec <- sqrt(log(p) / n) * sqrt(colSums(X_tilde ** 2)) / sqrt(n)
-        constr_left <- abs(colSums(diag(as.numeric(W / pi_hat - 1)) %*% X_tilde)) / n
 
-        if (all(constr_left <= lambda_vec)) {
+        constr_left <- abs(colSums(diag(as.numeric(W / pi_hat - 1)) %*% X_tilde)) / n
+        ratio_violate <- sum(constr_left > lambda_vec)/length(constr_left)
+
+        if (ratio_violate < ratio_violate_dcal) {
           weight_tilde <- weight_init
         } else{
           weight_ls <-
@@ -341,9 +355,9 @@ DCal.mean_treat <-
         mean_treat_ped_var <- sum((mean_treat_ped_vec - mean_treat_ped) ** 2) / (nrow(X) ** 2)
 
         ATE_mat[b,] <- c(mean_treat_init,
-                                mean_treat_init_var,
-                                mean_treat_ped,
-                                mean_treat_ped_var)
+                         mean_treat_init_var,
+                         mean_treat_ped,
+                         mean_treat_ped_var)
 
       }
     }
@@ -368,7 +382,8 @@ quad.prog.Lagr <- function(M,
                            target,
                            Mr,
                            kappa = 0.5,
-                           verbose = FALSE) {
+                           verbose = FALSE,
+                           weight_term = NULL) {
   # min (eta, mu): 1+n dim
   # require(Rmosek)
   prob <- list(sense = 'min')
@@ -376,7 +391,7 @@ quad.prog.Lagr <- function(M,
 
   prob$qobj$i <- 1:(ncol(M) + 1)
   prob$qobj$j <- 1:(ncol(M) + 1)
-  prob$qobj$v <- 2 * c(kappa, rep((1 - kappa) / (ncol(M)) ** 2, ncol(M)))
+  prob$qobj$v <- 2 * c(kappa, rep((1 - kappa) / (ncol(M)) ** weight_term, ncol(M)))
 
   prob$A <-  rbind(cbind(rep(-1, nrow(M)), M),
                    cbind(rep(-1, nrow(M)), -M))
@@ -411,10 +426,11 @@ quad.prog.Lagr <- function(M,
     is_converge <- TRUE
   } else{
     is_converge <- FALSE
+    mu_hat = rep(0, ncol(M))
   }
 
   return(list(
-    mu_hat = rep(0, ncol(M)),
+    mu_hat = mu_hat,
     eta_est = eta_est,
     is_converge = is_converge
   ))
@@ -463,8 +479,8 @@ double_cali.Lagr <-
     prob$bc <- rbind(blc = c(rep(-Inf, 2 * p), n),
                      buc = c(X_tilde_mean,-X_tilde_mean, n)) # constraint condition
 
-    prob$bx <- rbind(blx = c(rep(1, n1), 0),
-                     bux = c(rep(1 / 0.01, n1), Inf)) # variable condition
+    prob$bx <- rbind(blx = c(rep(1e-5, n1), 0),
+                     bux = c(rep(1 / 0.05, n1), Inf)) # variable condition
 
     if (verbose) {
       mosek.out <- Rmosek::mosek(prob)
@@ -487,8 +503,7 @@ double_cali.Lagr <-
     return(list(
       weight_tilde = weight_tilde,
       eta_pi = eta_pi,
-      is_converge = is_converge,
-      e = is_converge
+      is_converge = is_converge
     ))
 
   }
