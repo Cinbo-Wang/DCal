@@ -59,15 +59,15 @@
 #'
 #' # sparse linear OR
 #' beta_true <- rep(0,p)
-#' act_loc <- 1:d_beta # Confounder
-#' beta_true[act_loc] <- runif(d_beta,1,2)
+#' act_loc <- 1:s_or # Confounder
+#' beta_true[act_loc] <- runif(s_or,1,2)
 #' beta_true <-  beta_true / norm(beta_true,type='2')
 #' potential_outcome_treat <- X %*% beta_true + 1
 #' potential_outcome_control <- X %*% beta_true - 1
 #' Y <- potential_outcome_treat * W + potential_outcome_control * (1-W) + rnorm(n,0,1)
 #' tau_treat <- mean(potential_outcome_treat)
 #'
-#' mean_treat_dcal_ls <- DCal.mean_treat(X,Y,W,B=6,r1 = NULL,pi = NULL,
+#' mean_treat_dcal_ls <- DCal.mean_treat(X,Y,W,B=6,r1_init = NULL,pi_init = NULL,
 #'                      is.scale = FALSE,Y.family = 'gaussian',alpha = 0.9, is.parallel=FALSE)
 #'
 #' mean_treat_dcal_ls

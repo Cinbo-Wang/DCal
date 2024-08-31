@@ -10,8 +10,7 @@ devtools::install_github("Cinbo-Wang/DCal")
 We use the following examples to illustrate the basic usage of the DCal package. Here, the OR model is sparse linear model, while the propensity model is dense nonlinear.
 
 ```R
-p = 300; s_or = 10; n = 100;rho=0.9;rd_num = 1
-d_beta = s_or
+p = 400; s_or = 10; n = 200;rho=0.9;rd_num = 1
 Sigma_X <- matrix(0,p,p)
 for(i in 1:p){
   for(j in 1:p){
@@ -40,15 +39,15 @@ W <- rbinom(n = n,size=1,p=pi_W)
 
 # sparse linear OR
 beta_true <- rep(0,p)
-act_loc <- 1:d_beta # Confounder
-beta_true[act_loc] <- runif(d_beta,1,2)*sample(c(1,-1),size=d_beta,replace = T)
+act_loc <- 1:s_or # Confounder
+beta_true[act_loc] <- runif(s_or,1,2)
 beta_true <-  beta_true / norm(beta_true,type='2')
 potential_outcome_treat <- X %*% beta_true + 1
 potential_outcome_control <- X %*% beta_true
 Y <- potential_outcome_treat*W + potential_outcome_control*(1-W) + rnorm(n,0,1)
 tau_treat <- mean(potential_outcome_treat)
-mean_treat_cf_dcal_ls <- DCal.mean_treat(X,Y,W,B=3,r1 = NULL,pi = NULL,
-                                            is.scale = T,Y.family = 'gaussian',alpha = 0.9, is.parallel=F,core_num=3)
+mean_treat_cf_dcal_ls <- DCal.mean_treat(X,Y,W,B=3,r1_init = NULL,pi_init = NULL,
+                                            is.scale = FALSE,Y.family = 'gaussian',alpha = 0.9, is.parallel=F,)
 
 mean_treat_cf_dcal_ls
 
