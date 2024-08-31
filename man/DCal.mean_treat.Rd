@@ -100,6 +100,12 @@ mean_treat_dcal_ls <- DCal.mean_treat(X,Y,W,B=6,r1_init = NULL,pi_init = NULL,
                      is.scale = FALSE,Y.family = 'gaussian',alpha = 0.9, is.parallel=FALSE)
 
 mean_treat_dcal_ls
+CI_dcal <- c(
+      mean_treat_cf_dcal_ls$ATE_dc - qnorm(0.975)*sqrt(mean_treat_cf_dcal_ls$ATE_dc_var),
+      mean_treat_cf_dcal_ls$ATE_dc + qnorm(0.975)*sqrt(mean_treat_cf_dcal_ls$ATE_dc_var)
+)
+tau_treat;
+CI_dcal
 }
 }
 \references{
