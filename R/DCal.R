@@ -154,13 +154,14 @@ DCal.mean_treat <- function(X,
   loc0 <- which(W == 0)
   loc1 <- which(W == 1)
   if (is.parallel) {
+    require(doParallel);require(foreach)
     type <- ifelse(.Platform$OS.type == 'windows', 'PSOCK', 'FORK')
     core_num <- ifelse(!is.null(core_num),
                        core_num,
                        ifelse(.Platform$OS.type == 'windows', 4, min(25, B)))
-    cl <- parallel::makeCluster(core_num, type = type)
-    doParallel::registerDoParallel(cl)
-    ATE_mat_full <- foreach::foreach(
+    cl <- makeCluster(core_num, type = type)
+    registerDoParallel(cl)
+    ATE_mat_full <- foreach(
       b = 1:B,
       .combine = 'rbind',
       .export = c('quad.prog', 'double_cali_pi', 'double_cali')
@@ -280,8 +281,8 @@ DCal.mean_treat <- function(X,
         mean_treat_ped_var)
 
     }
-    doParallel::stopImplicitCluster()
-    parallel::stopCluster(cl)
+    stopImplicitCluster()
+    stopCluster(cl)
 
 
     ATE_mat <- ATE_mat_full[, 1:2]

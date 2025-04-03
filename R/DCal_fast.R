@@ -154,18 +154,18 @@ DCal_star.mean_treat <- function(X,
   loc0 <- which(W == 0)
   loc1 <- which(W == 1)
   if (is.parallel) {
-    # require(doParallel);require(foreach)
+    require(doParallel);require(foreach)
     type <- ifelse(.Platform$OS.type == 'windows', 'PSOCK', 'FORK')
     core_num <- ifelse(!is.null(core_num),
                        core_num,
                        ifelse(.Platform$OS.type == 'windows', 4, min(25, B)))
-    cl <- parallel::makeCluster(core_num, type = type)
-    doParallel::registerDoParallel(cl)
+    cl <- makeCluster(core_num, type = type)
+    registerDoParallel(cl)
     ATE_mat_full <-
-      foreach::foreach(
+      foreach(
         b = 1:B,
         .combine = 'rbind',
-        .export = c('quad.prog', 'double_cali_pi')
+        .export = c('quad.prog.mu_lu', 'double_cali_pi')
       ) %dopar% {
         set.seed(b)
 
@@ -216,7 +216,7 @@ DCal_star.mean_treat <- function(X,
               lb <- min((Y - r1_out)[loc_main])
               ub <- max((Y - r1_out)[loc_main])
               mu_hat_main_tmp_ls <-
-                quad.prog(
+                quad.prog.mu_lu(
                   M = M,
                   target = target,
                   lb = lb,
@@ -287,8 +287,8 @@ DCal_star.mean_treat <- function(X,
           mean_treat_ped_var)
 
       }
-    doParallel::stopImplicitCluster()
-    parallel::stopCluster(cl)
+    stopImplicitCluster()
+    stopCluster(cl)
 
 
     ATE_mat <- ATE_mat_full[, 1:2]
@@ -336,14 +336,14 @@ DCal_star.mean_treat <- function(X,
         if (sum(abs(target) > eta_r) == 0) {
           mu_hat_main <- rep(0, n_main)
         } else{
-          for (ratio in seq(0.1, 2, 0.1)) {
+          for (ratio in seq(0.1, 5, 0.1)) {
             eta_r <- ratio * sqrt(log(p) / n_main)
             M <- t(X_main) %*% Pi_main / n_main
 
             lb <- min((Y - r1_out)[loc_main])
             ub <- max((Y - r1_out)[loc_main])
             mu_hat_main_tmp_ls <-
-              quad.prog(
+              quad.prog.mu_lu(
                 M = M,
                 target = target,
                 lb = lb,
@@ -429,7 +429,7 @@ DCal_star.mean_treat <- function(X,
 # Additional functions: -------------------------
 ## Solve for mu: Quadratic program--------------------
 #' @keywords internal
-quad.prog <- function(M,
+quad.prog.mu_lu <- function(M,
                       target,
                       lb,
                       ub,
