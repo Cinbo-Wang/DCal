@@ -550,7 +550,7 @@ double_cali <- function(X,
   Xaug <- cbind(1, X)
   p <- ncol(Xaug)
   n <- nrow(Xaug)
-  if (F) {
+  if (n > p) {
     X_tilde <- cbind(diag(psi_deri) %*% Xaug, mu_hat, matrix(runif(n * (n - p), -1, 1), nrow = n))
   } else{
     X_tilde <- cbind(diag(psi_deri) %*% Xaug, mu_hat)
