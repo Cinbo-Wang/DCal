@@ -153,7 +153,7 @@ DCal_fast.mean_treat <- function(X,
     gamma_hat <- as.numeric(coef(fit.prop))
 
   } else{
-    pi_hat <-  pmax(pmin(pi_init, 0.99), 0.01)
+    pi_hat <- pmax(pmin(pi_init, 0.99), 0.01)
     gamma_hat <- gamma_init
   }
 
@@ -161,6 +161,13 @@ DCal_fast.mean_treat <- function(X,
   loc1 <- which(W == 1)
   if (is.parallel) {
     # require(doParallel);require(foreach)
+    if (!requireNamespace("doParallel", quietly = TRUE)) {
+      stop("Package 'doParallel' is required but not installed.")
+    }
+    if (!requireNamespace("foreach", quietly = TRUE)) {
+      stop("Package 'foreach' is required but not installed.")
+    }
+
     type <- ifelse(.Platform$OS.type == 'windows', 'PSOCK', 'FORK')
     core_num <- ifelse(!is.null(core_num),
                        core_num,

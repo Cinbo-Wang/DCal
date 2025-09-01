@@ -29,7 +29,7 @@ DCal.mean_treat(
 
 \item{Y.family}{Character specifying outcome type: \code{"gaussian"} for continuous or \code{"binomial"} for binary outcomes.}
 
-\item{B}{Number of random sample splits for cross-fitting (Default \eqn{\geq 3}).}
+\item{B}{Number of random sample splits for cross-fitting. Default: \code{3}.}
 
 \item{maxeval}{Maximum iterations for \eqn{\gamma} optimization. Default: \code{100}.}
 

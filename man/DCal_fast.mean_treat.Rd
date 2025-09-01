@@ -49,9 +49,9 @@ DCal_fast.mean_treat(
 }
 \value{
 A list containing:
-\item{ATE_vec}{Numeric vector of point estimates: [Single-Calibration, Double-Calibration] for E[Y(1)] averaged over splits}
-\item{var_ATE_vec}{Numeric vector of variance estimates: [Single-Calibration, Double-Calibration] averaged over splits}
-\item{ATE_mat}{\eqn{B \times 2} matrix of point estimates per split (Column 1: SCal, Column 2: DCal)}
+\item{ATE_vec}{Numeric vector of point estimates averaged over splits: [Single-Calibration, Double-Calibration] for E[Y(1)]}
+\item{var_ATE_vec}{Numeric vector of variance estimates averaged over splits: [Single-Calibration, Double-Calibration]}
+\item{ATE_mat}{\eqn{B \times 2} matrix of point estimates per split (Column 1: Single-Calibration, Column 2: Double-Calibration)}
 \item{var_ATE_mat}{\eqn{B \times 2} matrix of variance estimates per split}
 }
 \description{

@@ -164,6 +164,12 @@ DCal.mean_treat <- function(X,
   loc1 <- which(W == 1)
   if (is.parallel) {
     # require(doParallel);require(foreach)
+    if (!requireNamespace("doParallel", quietly = TRUE)) {
+      stop("Package 'doParallel' is required but not installed.")
+    }
+    if (!requireNamespace("foreach", quietly = TRUE)) {
+      stop("Package 'foreach' is required but not installed.")
+    }
     type <- ifelse(.Platform$OS.type == 'windows', 'PSOCK', 'FORK')
     core_num <- ifelse(!is.null(core_num),
                        core_num,
