@@ -1,30 +1,34 @@
-
-#' Estimation of E[Y(1)] from observational data using Double Calibration Estimator.
+#' Efficient Doubly-Calibrated Estimation of E[Y(1)] for Observational Data
 #'
-#' This function minimizes the L2 norm of 1/pi in the Double Calibration step instead,
-#' which will be faster than \code{DCal.mean_treat()}.
+#' Implements a computationally efficient version of Double Calibration for estimating expected outcomes under treatment.
+#' By minimizing L2-norm of inverse propensity weights (1/proensity score) during calibration instead of L1-norm of coefficients,
+#' this function achieves faster computation than \code{DCal.mean_treat} while maintaining root-n consistency under
+#' minimal sparsity conditions. Uses cross-fitting to avoid overfitting.
 #'
-#' @param X n by p input data matrix.
-#' @param Y n-dimensional observed response vector.
-#' @param W n-dimensional binary treatment assignment vector.
-#' @param Y.family Response type. Character specifying "gaussian" or "binomial".
-#' @param B Number of iterations for random splits for cross-fitting.
-#' @param is.scale Logical indicating whether to scale input matrix.
-#' @param r1_init Optional n-dimensional vector for E[Y|X,T=1] initial estimates. Default: NULL.
-#' @param pi_init Optional n-dimensional vector for propensity score E[W_i | X_i] initial estimates. Default: NULL.
-#' @param gamma_init Initial coefficient vector for outcome model.
-#' @param alpha Elastic net mixing parameter for the initial model, with 0 \eqn{\leq} alpha \eqn{\leq} 1.
-#' @param is.parallel Logical for parallel computation. Default: FALSE.
-#' @param core_num Number of cores used for parallel computation.
-#' @return
-#' \item{ATE_vec}{Point estimates of E[Y(1)] averaged over B splits.}
-#' \item{var_ATE_vec}{Variance estimates of SCal and DCal estimator averaged over B splits.}
-#' \item{ATE_mat}{Matrix of estimates E[Y(1)] per split.}
-#' \item{var_ATE_mat}{Matrix of variance estimates per split.}
+#' @param X An \eqn{n \times p} numeric matrix of high-dimensional covariates.
+#' @param Y Numeric vector of length \eqn{n} containing observed outcomes.
+#' @param W Numeric binary vector of length \eqn{n} (0 = control, 1 = treatment) for treatment assignments.
+#' @param Y.family Character specifying outcome type: \code{"gaussian"} for continuous or \code{"binomial"} for binary outcomes.
+#' @param B Number of random sample splits for cross-fitting. Default: \code{3}.
+#' @param K Number of folds per split for cross-fitting. Default: \code{2} (recommended).
+#' @param is.scale Logical indicating whether to standardize \code{X}. Default: \code{FALSE}.
+#' @param r1_init Optional initial estimates for \eqn{E[Y|X,W=1]}. Numeric vector of length \eqn{n}.
+#' @param pi_init Optional initial propensity score estimates \eqn{\hat\pi(X) = P(W=1|X)}. Numeric vector of length \eqn{n}.
+#' @param gamma_init Optional initial vector for calibration coefficients. Default: \code{NULL}.
+#' @param alpha Elastic net mixing parameter (0 = ridge, 1 = lasso) for initial nuisance function estimation.
+#' @param is.parallel Logical indicating whether to parallelize across sample splits. Default: \code{FALSE}.
+#' @param core_num Number of cores for parallel computation when \code{is.parallel = TRUE}.
+#'
+#' @return A list containing:
+#' \item{ATE_vec}{Numeric vector of point estimates averaged over splits: [Single-Calibration, Double-Calibration] for E[Y(1)]}
+#' \item{var_ATE_vec}{Numeric vector of variance estimates averaged over splits: [Single-Calibration, Double-Calibration]}
+#' \item{ATE_mat}{\eqn{B \times 2} matrix of point estimates per split (Column 1: Single-Calibration, Column 2: Double-Calibration)}
+#' \item{var_ATE_mat}{\eqn{B \times 2} matrix of variance estimates per split}
 #'
 #' @author Xinbo Wang
-#' @references Lin Liu, Xinbo Wang, and Yuhao Wang. (2023) \emph{Root-n consistent semiparametric learning with
-#' high-dimensional nuisance functions under minimal sparsity.} \url{https://arxiv.org/abs/2305.04174v4}
+#' @references
+#' Liu, L., Wang, X., Liu, L. and Wang, Y. (2023) \emph{Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity. arXiv preprint, arXiv:2305.04174}, \doi{10.48550/arXiv.2305.04174}.\cr
+#' Wang, Y. and Shah, R. D. (2025) \emph{Debiased inverse propensity score weighting for estimation of average treatment effects with high-dimensional confounders. The Annals of Statistics, Vol. 52(5), 1978-2003}, \doi{10.1214/24-AOS2409}.
 
 
 #' @examples
@@ -67,7 +71,8 @@
 #' X4 <- X[, 4] / (1 + exp(X[, 3]))
 #' X5 <- X[, 4] * X[, 5] / 10
 #'
-#' non_lin <- scale(cbind(X2, X3, X4, X5)) %*% c(1, -1 / 2, 1 / 3, -1 / 4) + bs(X[, 1], df = 100) %*% c(1 / (1:100))
+#' non_lin <- scale(cbind(X2, X3, X4, X5)) %*% c(1, -1 / 2, 1 / 3, -1 / 4) +
+#'     bs(X[, 1], df = 100) %*% c(1 / (1:100))
 #' term_cm <- (abs(non_lin) + 0.05) ** (-1) + X %*% beta_true
 #' potential_outcome_treat <-  term_cm - 1
 #' potential_outcome_control <- term_cm
@@ -75,16 +80,17 @@
 #' tau_treat_g <- mean(potential_outcome_treat)
 #'
 #'
-#' mean_treat_dcal_ls <- DCal_star.mean_treat(
+#' mean_treat_dcal_ls <- DCal_fast.mean_treat(
 #'   X,
 #'   Y,
 #'   W,
 #'   Y.family = 'gaussian',
 #'   B = 3,
+#'   K = 2,
 #'   is.scale = FALSE,
 #'   alpha = 0.9,
 #'   is.parallel = TRUE,
-#'   core_num = 3
+#'   core_num = 2
 #' )
 #' ate_vec <- mean_treat_dcal_ls$ATE_vec
 #' sd_vec <- sqrt(mean_treat_dcal_ls$var_ATE_vec)
@@ -94,23 +100,26 @@
 #' CI_lb_vec
 #' CI_ub_vec
 
-#' @export DCal_star.mean_treat
+#' @export DCal_fast.mean_treat
+#' @import parallel
 #' @import glmnet
 #' @import foreach
 #' @import doParallel
 #' @import stats
-DCal_star.mean_treat <- function(X,
+DCal_fast.mean_treat <- function(X,
                                  Y,
                                  W,
-                                 Y.family = c('gaussian', 'binomial')[1],
+                                 Y.family = 'gaussian',
                                  B = 3,
+                                 K = 2,
                                  is.scale = FALSE,
                                  r1_init = NULL,
                                  pi_init = NULL,
+                                 gamma_init = NULL,
                                  alpha = 0.9,
                                  is.parallel = FALSE,
                                  core_num = NULL) {
-  require(glmnet)
+  # require(glmnet)
   if (is.scale) {
     scl <- apply(X, 2, sd, na.rm = TRUE)
     is.binary <-
@@ -123,11 +132,10 @@ DCal_star.mean_treat <- function(X,
 
   if (is.null(r1_init)) {
     fit.out.treated <-
-      cv.glmnet(X[W == 1, ],
+      glmnet::cv.glmnet(X[W == 1, ],
                 Y[W == 1],
                 family = Y.family,
-                alpha = alpha,
-                nfolds = 5)
+                alpha = alpha)
     r1_out <-
       predict(fit.out.treated, newx = X, type = 'response')
   } else{
@@ -136,14 +144,12 @@ DCal_star.mean_treat <- function(X,
 
   if (is.null(pi_init)) {
     fit.prop <-
-      cv.glmnet(X,
+      glmnet::cv.glmnet(X,
                 W,
                 family = "binomial",
-                alpha = alpha,
-                nfolds = 5)
+                alpha = alpha)
     pi_hat <- predict(fit.prop, newx = X, type = 'response')
     pi_hat <- pmax(pmin(pi_hat, 0.99), 0.01)
-    num_act_ps <- fit.prop$nzero[which(fit.prop$lambda == fit.prop$lambda.1se)]
     gamma_hat <- as.numeric(coef(fit.prop))
 
   } else{
@@ -154,27 +160,27 @@ DCal_star.mean_treat <- function(X,
   loc0 <- which(W == 0)
   loc1 <- which(W == 1)
   if (is.parallel) {
-    require(doParallel);require(foreach)
+    # require(doParallel);require(foreach)
     type <- ifelse(.Platform$OS.type == 'windows', 'PSOCK', 'FORK')
     core_num <- ifelse(!is.null(core_num),
                        core_num,
                        ifelse(.Platform$OS.type == 'windows', 4, min(25, B)))
-    cl <- makeCluster(core_num, type = type)
-    registerDoParallel(cl)
+    cl <- parallel::makeCluster(core_num, type = type)
+    doParallel::registerDoParallel(cl)
     ATE_mat_full <-
-      foreach(
+      foreach::foreach(
         b = 1:B,
         .combine = 'rbind',
-        .export = c('quad.prog.mu_lu', 'double_cali_pi')
+        .export = c('quad.prog.mu', 'double_cali_pi')
       ) %dopar% {
         set.seed(b)
 
         # estimate mu using cross-fitting
         mu_hat <- rep(0, nrow(X))
-        loc0_2_group <- sample(1:2, size = length(loc0), replace = TRUE)
-        loc1_2_group <- sample(1:2, size = length(loc1), replace = TRUE)
+        loc0_2_group <- sample(1:K, size = length(loc0), replace = TRUE)
+        loc1_2_group <- sample(1:K, size = length(loc1), replace = TRUE)
 
-        for (foldid in 1:2) {
+        for (foldid in 1:K) {
           loc_main <- c(loc0[loc0_2_group == foldid], loc1[loc1_2_group == foldid])
           loc_aux <- c(loc0[loc0_2_group != foldid], loc1[loc1_2_group != foldid])
 
@@ -216,7 +222,7 @@ DCal_star.mean_treat <- function(X,
               lb <- min((Y - r1_out)[loc_main])
               ub <- max((Y - r1_out)[loc_main])
               mu_hat_main_tmp_ls <-
-                quad.prog.mu_lu(
+                quad.prog.mu(
                   M = M,
                   target = target,
                   lb = lb,
@@ -259,8 +265,7 @@ DCal_star.mean_treat <- function(X,
           weight_tilde <- NULL
           for (ratio in seq(0.1, 5, 0.1)) {
             eta_pi <- ratio * sqrt(log(ncol(X) + 1) / nrow(X))
-            weight_init <- 1 / pi_hat[W == 1]
-            result_dcal_init_ls <- double_cali_pi(X, W, mu_hat, psi_deri, eta_pi, weight_init)
+            result_dcal_init_ls <- double_cali_pi(X, W, mu_hat, psi_deri, eta_pi)
 
 
             if (result_dcal_init_ls$is_converge) {
@@ -287,8 +292,8 @@ DCal_star.mean_treat <- function(X,
           mean_treat_ped_var)
 
       }
-    stopImplicitCluster()
-    stopCluster(cl)
+    doParallel::stopImplicitCluster()
+    parallel::stopCluster(cl)
 
 
     ATE_mat <- ATE_mat_full[, 1:2]
@@ -299,10 +304,10 @@ DCal_star.mean_treat <- function(X,
     for (b in 1:B) {
       set.seed(b)
       # estimate mu using cross-fitting
-      loc0_2_group <- sample(1:2, size = length(loc0), replace = TRUE)
-      loc1_2_group <- sample(1:2, size = length(loc1), replace = TRUE)
+      loc0_2_group <- sample(1:K, size = length(loc0), replace = TRUE)
+      loc1_2_group <- sample(1:K, size = length(loc1), replace = TRUE)
       mu_hat <- rep(0, nrow(X))
-      for (foldid in 1:2) {
+      for (foldid in 1:K) {
         loc_main <- c(loc0[loc0_2_group == foldid], loc1[loc1_2_group == foldid])
         loc_aux <- c(loc0[loc0_2_group != foldid], loc1[loc1_2_group != foldid])
 
@@ -343,7 +348,7 @@ DCal_star.mean_treat <- function(X,
             lb <- min((Y - r1_out)[loc_main])
             ub <- max((Y - r1_out)[loc_main])
             mu_hat_main_tmp_ls <-
-              quad.prog.mu_lu(
+              quad.prog.mu(
                 M = M,
                 target = target,
                 lb = lb,
@@ -386,8 +391,7 @@ DCal_star.mean_treat <- function(X,
         for (ratio in seq(0.1, 5, 0.1)) {
           eta_pi <- ratio * sqrt(log(ncol(X) + 1) / nrow(X))
           weight_init <- 1 / pi_hat[W == 1]
-          result_dcal_init_ls <- double_cali_pi(X, W, mu_hat, psi_deri, eta_pi, weight_init)
-
+          result_dcal_init_ls <- double_cali_pi(X, W, mu_hat, psi_deri, eta_pi)
 
           if (result_dcal_init_ls$is_converge) {
             weight_tilde <- result_dcal_init_ls$weight_tilde
@@ -429,7 +433,7 @@ DCal_star.mean_treat <- function(X,
 # Additional functions: -------------------------
 ## Solve for mu: Quadratic program--------------------
 #' @keywords internal
-quad.prog.mu_lu <- function(M,
+quad.prog.mu <- function(M,
                       target,
                       lb,
                       ub,
@@ -492,23 +496,34 @@ double_cali_pi <- function(X,
                            mu_hat,
                            psi_deri = NULL,
                            eta_pi = NULL,
-                           weight_init = NULL,
                            verbose = FALSE) {
   # require(Rmosek)
   Xaug <- cbind(1, X)
   p <- ncol(Xaug)
   n <- nrow(Xaug)
-  if (n > p) {
-    X_tilde <- cbind(diag(psi_deri) %*% Xaug, mu_hat, matrix(runif(n * (n - p), -1, 1), nrow = n))
-  } else{
-    X_tilde <- cbind(diag(psi_deri) %*% Xaug, mu_hat)
+  if(n <= p){
+    X_tilde <- Xaug
+  }else{
+    X_tilde <- cbind(Xaug, matrix(runif(n * (n - p),-1, 1), nrow = n))
   }
-  num_cond <- ncol(X_tilde)
-  X1_tilde <- X_tilde[W == 1, ]
-  n1 <- nrow(X1_tilde)
 
-  lambda0_vec <- sqrt(colSums(X_tilde ** 2)) / sqrt(n) * eta_pi
-  X_tilde_mean <- colMeans(X_tilde)
+  if(all(unique(psi_deri) == 1)){
+    # gaussian
+    if(n <= p){
+      X_cmb <- cbind(Xaug, mu_hat)
+    }else{
+      X_cmb <- cbind(Xaug, mu_hat, X_tilde[, -c(1:p)])
+    }
+  }else{
+    X_cmb <- cbind(diag(psi_deri) %*% Xaug, mu_hat, X_tilde)
+  }
+
+  num_cond <- ncol(X_cmb)
+  X1_cmb <- X_cmb[W == 1,]
+  n1 <- nrow(X1_cmb)
+
+  lambda0_vec <- sqrt(colSums(X_cmb ** 2)) / sqrt(n) * eta_pi
+  X_cmb_mean <- colMeans(X_cmb)
 
 
   prob <- list(sense = 'min')
@@ -516,15 +531,18 @@ double_cali_pi <- function(X,
   prob$qobj$i <- 1:(n1)
   prob$qobj$j <- 1:(n1)
   prob$qobj$v <- 2 * rep(1 / n1, n1)
-  prob$A <- rbind(cbind(t(X1_tilde / n)), cbind(-t(X1_tilde / n)), rep(1, n1))
+  prob$A <- rbind(cbind(t(X1_cmb / n)), cbind(-t(X1_cmb / n)), rep(1, n1))
   prob$bc <- rbind(
     blc = c(rep(-Inf, 2 * num_cond), n),
     buc = c(
-      X_tilde_mean + lambda0_vec - 1e-4,-X_tilde_mean + lambda0_vec  - 1e-4,
+      X_cmb_mean + lambda0_vec - 1e-4,
+      -X_cmb_mean + lambda0_vec  - 1e-4,
       n
     )
   )
-  prob$bx <- rbind(blx = c(rep(1e-5, n1)), bux = c(rep(1 / 0.05, n1)))
+  prob$bx <- rbind(blx = c(rep(1e-5, n1)),
+                   bux = c(rep(1 / 0.01, n1)))
+
   if (verbose) {
     mosek.out <- Rmosek::mosek(prob)
   } else{

@@ -1,27 +1,25 @@
 Package: DCal
 Type: Package
-Title: Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity
-Version: 0.1.0
+Title: Doubly-Calibrated Treatment Effect Estimation
+Version: 0.1.1
 Authors@R: c(
     person("Xinbo", "Wang", email = "cinbo_w@sjtu.edu.cn", role = c("cre", "aut")),
     person("Liu", "Liu", email = "linliu@sjtu.edu.cn", role = "ctb"),
     person("Yuhao", "Wang", email = "yuhaow.thu@gmail.com", role = "ctb"))
 Maintainer: Xinbo Wang <cinbo_w@sjtu.edu.cn>
-Description: DCal package is designed for treatment effect estimation with high-dimensional nuisance parameters. 
-    It uses a new Double-Calibration strategy that corrects the estimation bias of the nuisance parameter estimates
-    computated by regularized high-dimensional techniques. Details of the methodology can be found in Lin Liu, Xinbo Wang, and Yuhao Wang (2023) 
-    "Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity"
-    <arXiv:2305.04174>. The package relies on the optimisation
-    software 'MOSEK' <https://www.mosek.com/> which must be installed separately;
-    see the documentation for 'Rmosek'. 
+Description: Implements a novel Double-Calibration (DCal) strategy for estimating treatment effects and other semiparametric parameters in high-dimensional settings. This method corrects the regularization bias from machine learning models (e.g., lasso) used to estimate nuisance functions, requiring only minimal sparsity conditions. Achieves root-n consistency even when one nuisance function is arbitrarily misspecified. Details of the methodology can be found in Lin Liu, Xinbo Wang, and Yuhao Wang (2023) "Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity" <arXiv:2305.04174>. The package relies on the optimisation software 'MOSEK' <https://www.mosek.com/> which must be installed separately; see the documentation for 'Rmosek'.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 NeedsCompilation: no
+Suggests:
+  MASS
 Imports: 
     doParallel,
+    parallel,
     foreach,
     glmnet,
     Rmosek,
+    nloptr,
     stats

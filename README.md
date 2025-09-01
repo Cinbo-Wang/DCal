@@ -64,11 +64,12 @@ mean_treat_dcal_ls <- DCal.mean_treat(
   Y,
   W,
   Y.family = 'gaussian',
-  B = 2,
+  B = 3,
+  maxeval = 100,
   is.scale = FALSE,
   alpha = 0.9,
   is.parallel = TRUE,
-  core_num = 2
+  core_num = 3
 )
 ate_vec <- mean_treat_dcal_ls$ATE_vec
 sd_vec <- sqrt(mean_treat_dcal_ls$var_ATE_vec)
@@ -79,18 +80,20 @@ CI_lb_vec
 CI_ub_vec
 
 # Faster version
-mean_treat_dcal_ls <- DCal_star.mean_treat(
+mean_treat_dcal_fast_ls <- DCal_fast.mean_treat(
   X,
   Y,
   W,
   Y.family = 'gaussian',
-  B = 6,
+  B = 3,
+  K = 2,
   is.scale = FALSE,
   alpha = 0.9,
-  is.parallel = FALSE
+  is.parallel = TRUE,
+  core_num = 3
 )
-ate_vec <- mean_treat_dcal_ls$ATE_vec
-sd_vec <- sqrt(mean_treat_dcal_ls$var_ATE_vec)
+ate_vec <- mean_treat_dcal_fast_ls$ATE_vec
+sd_vec <- sqrt(mean_treat_dcal_fast_ls$var_ATE_vec)
 CI_lb_vec <- ate_vec - qnorm(0.975) * sd_vec
 CI_ub_vec <- ate_vec + qnorm(0.975) * sd_vec
 ate_vec
