@@ -61,6 +61,12 @@ this function achieves faster computation than \code{DCal.mean_treat} while main
 minimal sparsity conditions. Uses cross-fitting to avoid overfitting.
 }
 \examples{
+\dontrun{
+# Notice that the external optimization software \code{MOSEK}
+# must be installed separately before running the example code.
+# Without \code{MOSEK}, the example code is not executable.
+# For how to install \code{MOSEK},see [Rmosek installation guide]
+# (https://docs.mosek.com/11.0/rmosek/install-interface.html#system-requirements).
 p = 400
 s_or = 10
 n = 200
@@ -128,6 +134,8 @@ CI_ub_vec <- ate_vec + qnorm(0.975) * sd_vec
 ate_vec
 CI_lb_vec
 CI_ub_vec
+}
+
 }
 \references{
 Liu, L., Wang, X., Liu, L. and Wang, Y. (2023) \emph{Root-n consistent semiparametric learning with high-dimensional nuisance functions under minimal sparsity. arXiv preprint, arXiv:2305.04174}, \doi{10.48550/arXiv.2305.04174}.\cr

@@ -62,6 +62,11 @@ cross-fitting to avoid overfitting. Computation may take several minutes due to 
 }
 \examples{
 \dontrun{
+# Notice that the external optimization software \code{MOSEK}
+# must be installed separately before running the example code.
+# Without \code{MOSEK}, the example code is not executable.
+# For how to install \code{MOSEK}, see [Rmosek installation guide]
+# (https://docs.mosek.com/11.0/rmosek/install-interface.html#system-requirements).
 p = 400
 s_or = 10
 n = 200
